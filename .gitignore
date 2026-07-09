@@ -1,0 +1,15 @@
+# Secrets / credentials
+.env
+credentials/
+*.json
+!package.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
