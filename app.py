@@ -19,7 +19,10 @@ from data_sources import ga4, gsc
 
 st.set_page_config(page_title="Hagakure Web 分析ダッシュボード", layout="wide")
 st.title("Hagakure Web 分析ダッシュボード")
-st.caption("Search Console（流入前）× GA4（流入後）を、わかりやすく1画面に")
+st.caption(
+    "佐賀でプログラミングを学びたい非エンジニア／エンジニアに届いているかを、"
+    "Search Console × GA4 で観察する"
+)
 
 # --- 設定チェック ---
 settings = load_settings()
@@ -62,6 +65,7 @@ def load_all(start: str, end: str, prev_s: str, prev_e: str):
         "date_ga4": ga4.fetch_by_date(start, end),
         "date_gsc": gsc.fetch_by_date(start, end),
         "query_gsc": gsc.fetch_by_query(start, end),
+        "prev_query_gsc": gsc.fetch_by_query(prev_s, prev_e),
         "channel_ga4": ga4.fetch_by_channel(start, end),
         "device_ga4": ga4.fetch_by_device(start, end),
     }
@@ -75,6 +79,11 @@ if run:
     st.session_state["data"] = load_all(s, e, ps, pe)
 
 data = st.session_state["data"]
+# 旧キャッシュ（prev_query_gsc なし）は再取得を促す
+if "prev_query_gsc" not in data:
+    st.warning("データ形式が更新されました。サイドバーの「データ取得」を再度押してください。")
+    st.stop()
+
 gsc_page = data["page_gsc"]
 ga4_page = data["page_ga4"]
 merged = merge_by_page(ga4_page, gsc_page)
@@ -94,6 +103,7 @@ _COLCFG = {
 }
 
 tabs = st.tabs([
+    "🎯 目的達成",
     "🩺 健康診断",
     "💡 改善のヒント",
     "📄 ページ別 統合ビュー",
@@ -103,10 +113,81 @@ tabs = st.tabs([
     "🌐 流入経路・デバイス",
 ])
 
+_STATUS_ICON = {"up": "🟢", "flat": "🟡", "down": "🔴", "unknown": "⚪"}
+
 # =====================================================================
-# タブ1: 健康診断
+# タブ1: 目的達成ボード（誰に届いたか）
 # =====================================================================
 with tabs[0]:
+    st.subheader("狙った人に届いているか")
+    st.caption(
+        f"検索クエリから「誰向けの検索か」を推定し、"
+        f"対象期間 {s} 〜 {e} を直前の {ps} 〜 {pe} と比較します。"
+        "指標はクリック数の前期比です。"
+    )
+
+    persona_cards = insights.build_persona_scorecard(
+        data["query_gsc"], data["prev_query_gsc"]
+    )
+    pcols = st.columns(len(persona_cards))
+    for col, card in zip(pcols, persona_cards):
+        delta_txt = None if card["delta"] is None else f"{card['delta']:+.1f}%"
+        col.metric(
+            f"{_STATUS_ICON[card['status']]} {card['label']}",
+            f"{int(card['current_clicks']):,} クリック",
+            delta=delta_txt,
+            help=(
+                f"表示 {int(card['current_impressions']):,}回 / "
+                f"CTR {card['current_ctr']:.2f}% / "
+                f"平均順位 {card['current_position']:.1f} / "
+                f"キーワード {card['current_queries']}件"
+            ),
+        )
+        col.caption(
+            f"表示 {int(card['current_impressions']):,}　"
+            f"CTR {card['current_ctr']:.1f}%　"
+            f"順位 {card['current_position']:.1f}"
+        )
+
+    st.divider()
+    st.markdown("#### 各ペルソナの代表キーワード")
+    persona_keys = [("local", "📍 佐賀ローカル"),
+                    ("beginner", "🌱 非エンジニア・学び始め"),
+                    ("engineer", "🧑‍💻 エンジニア・実務寄り")]
+    qcols = st.columns(3)
+    for col, (pkey, plabel) in zip(qcols, persona_keys):
+        with col:
+            st.markdown(f"**{plabel}**")
+            top_q = insights.top_queries_for_persona(data["query_gsc"], pkey, top=6)
+            if top_q.empty:
+                st.info("該当キーワードなし")
+            else:
+                st.dataframe(
+                    top_q,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "query": st.column_config.TextColumn("キーワード"),
+                        "clicks": st.column_config.NumberColumn("クリック", format="%d"),
+                        "impressions": st.column_config.NumberColumn("表示", format="%d"),
+                        "ctr": st.column_config.NumberColumn("CTR", format="%.1f%%"),
+                        "position": st.column_config.NumberColumn("順位", format="%.1f"),
+                    },
+                    height=260,
+                )
+
+    st.divider()
+    st.markdown(
+        "**信号の見方**　🟢 前より良くなった（+5%超）／🟡 ほぼ横ばい／"
+        "🔴 前より下がった（−5%超）／⚪ 比較データなし  \n"
+        "※「佐賀 プログラミング 初心者」のように複数に当てはまる語は、"
+        "スコアカードではそれぞれのペルソナに計上します。"
+    )
+
+# =====================================================================
+# タブ2: 健康診断
+# =====================================================================
+with tabs[1]:
     st.subheader("今週の健康診断")
     st.caption(f"対象期間 {s} 〜 {e} を、直前の {ps} 〜 {pe} と比較しています。")
 
@@ -114,7 +195,6 @@ with tabs[0]:
     prev_totals = insights.summarize_totals(data["prev_page_gsc"], data["prev_page_ga4"])
     cards = insights.build_health(cur_totals, prev_totals)
 
-    _icon = {"up": "🟢", "flat": "🟡", "down": "🔴", "unknown": "⚪"}
     cols = st.columns(len(cards))
     for col, card in zip(cols, cards):
         if card["key"] == "ctr":
@@ -126,7 +206,7 @@ with tabs[0]:
         else:
             delta_txt = f"{card['delta']:+.1f}%"
         col.metric(
-            f"{_icon[card['status']]} {card['label']}",
+            f"{_STATUS_ICON[card['status']]} {card['label']}",
             value,
             delta=delta_txt,
             help=GLOSSARY.get(card["key"], ""),
@@ -139,9 +219,9 @@ with tabs[0]:
     )
 
 # =====================================================================
-# タブ2: 改善のヒント
+# タブ3: 改善のヒント
 # =====================================================================
-with tabs[1]:
+with tabs[2]:
     st.subheader("改善のヒント（自動アドバイス）")
     st.caption("数字を自動で読み解いて、次に手を打つとよさそうな場所を提案します。")
 
@@ -162,9 +242,9 @@ with tabs[1]:
                     st.caption(h["detail"])
 
 # =====================================================================
-# タブ3: ページ別 統合ビュー
+# タブ4: ページ別 統合ビュー
 # =====================================================================
-with tabs[2]:
+with tabs[3]:
     st.subheader("ページ別：検索パフォーマンス × サイト内行動")
     st.dataframe(merged, use_container_width=True, column_config=_COLCFG)
     st.caption(
@@ -173,9 +253,9 @@ with tabs[2]:
     )
 
 # =====================================================================
-# タブ4: 伸び / 落ち
+# タブ5: 伸び / 落ち
 # =====================================================================
-with tabs[3]:
+with tabs[4]:
     st.subheader("伸びてる / 落ちてるページ")
     st.caption(f"クリック数の増減で比較（{s}〜{e} vs {ps}〜{pe}）。")
 
@@ -201,9 +281,9 @@ with tabs[3]:
             st.dataframe(fallers, use_container_width=True, hide_index=True, column_config=mover_cfg)
 
 # =====================================================================
-# タブ5: 推移
+# タブ6: 推移
 # =====================================================================
-with tabs[4]:
+with tabs[5]:
     st.subheader("日別の推移")
     date_gsc = data["date_gsc"]
     date_ga4 = data["date_ga4"]
@@ -229,17 +309,17 @@ with tabs[4]:
         st.info("この期間のデータがありません。")
 
 # =====================================================================
-# タブ6: 検索キーワード（ことば地図）
+# タブ7: 検索キーワード（誰向けか）
 # =====================================================================
-with tabs[5]:
-    st.subheader("検索キーワードのことば地図")
+with tabs[6]:
+    st.subheader("検索キーワード：誰向けの検索か")
     query_gsc = data["query_gsc"]
 
     if query_gsc.empty:
         st.info("この期間の検索クエリデータがありません。")
     else:
-        grouped = insights.group_queries(query_gsc)
-        st.markdown("#### どんな気持ちで検索して来ているか")
+        grouped = insights.group_queries_by_persona(query_gsc)
+        st.markdown("#### クリックの内訳（ペルソナ）")
         gcol1, gcol2 = st.columns([1, 1])
         with gcol1:
             fig = go.Figure(data=[go.Pie(
@@ -250,19 +330,26 @@ with tabs[5]:
             st.dataframe(
                 grouped, use_container_width=True, hide_index=True,
                 column_config={
-                    "group": st.column_config.TextColumn("グループ"),
+                    "group": st.column_config.TextColumn("ペルソナ"),
                     "clicks": st.column_config.NumberColumn("クリック", format="%d"),
                     "impressions": st.column_config.NumberColumn("表示回数", format="%d"),
                     "件数": st.column_config.NumberColumn("キーワード数", format="%d"),
                 },
             )
-        st.caption("「知りたい・困りごと」が多い＝解説記事が求められている、などの気づきに。")
+        st.caption(
+            "円グラフは1キーワードを1ペルソナに分類"
+            "（優先: 佐賀ローカル → 非エンジニア → エンジニア → その他）。"
+            "目的達成タブのスコアカードとは数え方が少し異なります。"
+        )
 
         st.divider()
         st.markdown("#### キーワード一覧")
+        list_df = query_gsc.copy()
+        list_df["persona"] = list_df["query"].apply(insights.classify_persona)
         st.dataframe(
-            query_gsc, use_container_width=True, hide_index=True,
+            list_df, use_container_width=True, hide_index=True,
             column_config={
+                "persona": st.column_config.TextColumn("ペルソナ"),
                 "query": st.column_config.TextColumn("検索キーワード"),
                 "clicks": st.column_config.NumberColumn("クリック", help=GLOSSARY["clicks"], format="%d"),
                 "impressions": st.column_config.NumberColumn("表示回数", help=GLOSSARY["impressions"], format="%d"),
@@ -272,9 +359,9 @@ with tabs[5]:
         )
 
 # =====================================================================
-# タブ7: 流入経路・デバイス
+# タブ8: 流入経路・デバイス
 # =====================================================================
-with tabs[6]:
+with tabs[7]:
     st.subheader("どこから来た？ 何で見てる？")
 
     channel = data["channel_ga4"].copy()
