@@ -1,0 +1,76 @@
+{
+  "run_id": "2026-07",
+  "collected_at": "2026-07-24",
+  "days": 28,
+  "current_period": {
+    "start": "2026-06-26",
+    "end": "2026-07-23"
+  },
+  "previous_period": {
+    "start": "2026-05-29",
+    "end": "2026-06-25"
+  },
+  "ga4_property_id": "351757681",
+  "gsc_site_url": "sc-domain:hagakurepgm.net",
+  "totals": {
+    "current": {
+      "pages": 39,
+      "impressions": 1261.0,
+      "clicks": 49.0,
+      "ctr": 3.8858049167327517,
+      "sessions": 93.0,
+      "totalUsers": 62.0
+    },
+    "previous": {
+      "pages": 48,
+      "impressions": 2519.0,
+      "clicks": 74.0,
+      "ctr": 2.9376736800317587,
+      "sessions": 78.0,
+      "totalUsers": 68.0
+    }
+  },
+  "by_site": {
+    "lp": {
+      "current": {
+        "pages": 5,
+        "impressions": 101.0,
+        "clicks": 13.0,
+        "ctr": 12.871287128712872,
+        "sessions": 93.0,
+        "totalUsers": 62.0
+      },
+      "previous": {
+        "pages": 11,
+        "impressions": 122.0,
+        "clicks": 15.0,
+        "ctr": 12.295081967213115,
+        "sessions": 73.0,
+        "totalUsers": 63.0
+      }
+    },
+    "blog": {
+      "current": {
+        "pages": 34,
+        "impressions": 1160.0,
+        "clicks": 36.0,
+        "ctr": 3.103448275862069,
+        "sessions": 0.0,
+        "totalUsers": 0.0
+      },
+      "previous": {
+        "pages": 37,
+        "impressions": 2397.0,
+        "clicks": 59.0,
+        "ctr": 2.461410095953275,
+        "sessions": 5.0,
+        "totalUsers": 5.0
+      }
+    }
+  },
+  "notes": [
+    "site=blog は page が /blog または /blog/ で始まる行。それ以外は lp。",
+    "フォーム送信などのコンバージョンは、キーイベント未設定のため本スクリプトでは取得しない。",
+    "実測値のみ。推測はレポート本文で区別して書くこと。"
+  ]
+}

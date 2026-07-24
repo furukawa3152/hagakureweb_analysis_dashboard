@@ -3,6 +3,7 @@
 credentials/
 *.json
 !package.json
+!reports/**/*.json
 
 # Python
 __pycache__/
