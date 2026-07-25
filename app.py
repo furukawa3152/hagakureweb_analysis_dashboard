@@ -68,6 +68,8 @@ def load_all(start: str, end: str, prev_s: str, prev_e: str):
         "prev_query_gsc": gsc.fetch_by_query(prev_s, prev_e),
         "channel_ga4": ga4.fetch_by_channel(start, end),
         "device_ga4": ga4.fetch_by_device(start, end),
+        "form_click_ga4": ga4.fetch_form_clicks(start, end),
+        "prev_form_click_ga4": ga4.fetch_form_clicks(prev_s, prev_e),
     }
 
 
@@ -79,8 +81,8 @@ if run:
     st.session_state["data"] = load_all(s, e, ps, pe)
 
 data = st.session_state["data"]
-# 旧キャッシュ（prev_query_gsc なし）は再取得を促す
-if "prev_query_gsc" not in data:
+# 旧キャッシュは再取得を促す
+if not {"prev_query_gsc", "form_click_ga4", "prev_form_click_ga4"} <= data.keys():
     st.warning("データ形式が更新されました。サイドバーの「データ取得」を再度押してください。")
     st.stop()
 
@@ -148,6 +150,48 @@ with tabs[0]:
             f"CTR {card['current_ctr']:.1f}%　"
             f"順位 {card['current_position']:.1f}"
         )
+
+    st.divider()
+    st.markdown("#### 参加につながる行動")
+    form_clicks = data["form_click_ga4"]
+    prev_form_clicks = data["prev_form_click_ga4"]
+    form_click_count = float(form_clicks["eventCount"].sum())
+    prev_form_click_count = float(prev_form_clicks["eventCount"].sum())
+    form_click_delta = insights.pct_delta(form_click_count, prev_form_click_count)
+    form_click_status = insights.status_of(form_click_delta)
+    form_click_delta_txt = (
+        None if form_click_delta is None else f"{form_click_delta:+.1f}%"
+    )
+    action_col, detail_col = st.columns([1, 2])
+    action_col.metric(
+        f"{_STATUS_ICON[form_click_status]} 参加フォームへのクリック",
+        f"{int(form_click_count):,} 回",
+        delta=form_click_delta_txt,
+        help=GLOSSARY["formLinkClicks"],
+    )
+    action_col.caption(f"前期 {int(prev_form_click_count):,} 回")
+    with detail_col:
+        if form_clicks.empty:
+            st.info("対象期間の参加フォームリンククリックはありません。")
+        else:
+            form_link_summary = (
+                form_clicks.groupby("linkUrl", as_index=False)["eventCount"]
+                .sum()
+                .sort_values("eventCount", ascending=False)
+            )
+            st.dataframe(
+                form_link_summary,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "linkUrl": st.column_config.LinkColumn("リンク先"),
+                    "eventCount": st.column_config.NumberColumn("クリック", format="%d"),
+                },
+            )
+    st.caption(
+        f"GA4イベント `{ga4.FORM_CLICK_EVENT}` の件数です。"
+        "フォームを開いた回数であり、送信完了数ではありません。"
+    )
 
     st.divider()
     st.markdown("#### 各ペルソナの代表キーワード")

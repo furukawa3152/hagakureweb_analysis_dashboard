@@ -25,6 +25,8 @@ from google.analytics.data_v1beta import BetaAnalyticsDataClient  # noqa: E402
 from google.analytics.data_v1beta.types import (  # noqa: E402
     DateRange,
     Dimension,
+    Filter,
+    FilterExpression,
     Metric,
     RunReportRequest,
 )
@@ -41,6 +43,7 @@ GA4_METRICS = [
     "engagementRate",
 ]
 GSC_METRICS = ["clicks", "impressions", "ctr", "position"]
+FORM_CLICK_EVENT = "googleform_click"
 
 
 def site_segment(page: str) -> str:
@@ -60,7 +63,12 @@ def period_pair(end: date, days: int) -> tuple[date, date, date, date]:
 def write_csv(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(
+            f,
+            fieldnames=fieldnames,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -96,6 +104,40 @@ def ga4_report(
             record[name] = num
         rows.append(record)
     return rows
+
+
+def ga4_form_clicks(
+    client: BetaAnalyticsDataClient,
+    property_id: str,
+    start: str,
+    end: str,
+) -> list[dict]:
+    """参加フォームへのリンククリックを日付・リンク先別に取得する。"""
+    request = RunReportRequest(
+        property=f"properties/{property_id}",
+        dimensions=[Dimension(name="date"), Dimension(name="linkUrl")],
+        metrics=[Metric(name="eventCount")],
+        date_ranges=[DateRange(start_date=start, end_date=end)],
+        dimension_filter=FilterExpression(
+            filter=Filter(
+                field_name="eventName",
+                string_filter=Filter.StringFilter(
+                    value=FORM_CLICK_EVENT,
+                    match_type=Filter.StringFilter.MatchType.EXACT,
+                ),
+            )
+        ),
+        limit=100000,
+    )
+    response = client.run_report(request)
+    return [
+        {
+            "date": row.dimension_values[0].value,
+            "linkUrl": row.dimension_values[1].value,
+            "eventCount": float(row.metric_values[0].value),
+        }
+        for row in response.rows
+    ]
 
 
 def gsc_query(service, site_url: str, dimensions: list[str], start: str, end: str) -> list[dict]:
@@ -255,6 +297,14 @@ def main() -> int:
     device = [
         {"device": r["deviceCategory"], **{k: r[k] for k in GA4_METRICS}} for r in device_raw
     ]
+    form_clicks = ga4_form_clicks(ga4_client, settings.ga4_property_id, s, e)
+    prev_form_clicks = ga4_form_clicks(ga4_client, settings.ga4_property_id, ps, pe)
+    print(
+        "form link clicks current/previous: "
+        f"{sum(r['eventCount'] for r in form_clicks):.0f}/"
+        f"{sum(r['eventCount'] for r in prev_form_clicks):.0f}",
+        flush=True,
+    )
 
     merged = merge_by_page(
         [{k: v for k, v in r.items() if k != "site"} for r in page_ga4],
@@ -286,6 +336,16 @@ def main() -> int:
     write_csv(out_dir / "query_gsc.csv", query_gsc, ["query", *GSC_METRICS])
     write_csv(out_dir / "channel_ga4.csv", channel, ["channel", *GA4_METRICS])
     write_csv(out_dir / "device_ga4.csv", device, ["device", *GA4_METRICS])
+    write_csv(
+        out_dir / "form_click_ga4.csv",
+        form_clicks,
+        ["date", "linkUrl", "eventCount"],
+    )
+    write_csv(
+        out_dir / "prev_form_click_ga4.csv",
+        prev_form_clicks,
+        ["date", "linkUrl", "eventCount"],
+    )
     print("csv files written", flush=True)
 
     by_site = {}
@@ -307,9 +367,15 @@ def main() -> int:
             "previous": summarize_merged(prev_merged),
         },
         "by_site": by_site,
+        "form_link_clicks": {
+            "event_name": FORM_CLICK_EVENT,
+            "current": sum(r["eventCount"] for r in form_clicks),
+            "previous": sum(r["eventCount"] for r in prev_form_clicks),
+        },
         "notes": [
             "site=blog は page が /blog または /blog/ で始まる行。それ以外は lp。",
-            "フォーム送信などのコンバージョンは、キーイベント未設定のため本スクリプトでは取得しない。",
+            f"{FORM_CLICK_EVENT} は参加フォームへのリンククリック。フォーム送信完了ではない。",
+            "フォーム送信完了数は本スクリプトでは取得しない。",
             "実測値のみ。推測はレポート本文で区別して書くこと。",
         ],
     }

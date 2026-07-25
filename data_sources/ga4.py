@@ -6,6 +6,8 @@ from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import (
     DateRange,
     Dimension,
+    Filter,
+    FilterExpression,
     Metric,
     RunReportRequest,
 )
@@ -22,6 +24,7 @@ _METRICS = [
     "averageSessionDuration",
     "engagementRate",
 ]
+FORM_CLICK_EVENT = "googleform_click"
 
 
 def _client() -> BetaAnalyticsDataClient:
@@ -81,3 +84,38 @@ def fetch_by_device(start_date: str, end_date: str) -> pd.DataFrame:
     """デバイス（PC/スマホ/タブレット）別の指標。"""
     df = _run("deviceCategory", start_date, end_date)
     return df.rename(columns={"deviceCategory": "device"})
+
+
+def fetch_form_clicks(start_date: str, end_date: str) -> pd.DataFrame:
+    """参加フォームへのリンククリックを日付・リンク先別に取得。"""
+    settings = load_settings()
+    request = RunReportRequest(
+        property=f"properties/{settings.ga4_property_id}",
+        dimensions=[Dimension(name="date"), Dimension(name="linkUrl")],
+        metrics=[Metric(name="eventCount")],
+        date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+        dimension_filter=FilterExpression(
+            filter=Filter(
+                field_name="eventName",
+                string_filter=Filter.StringFilter(
+                    value=FORM_CLICK_EVENT,
+                    match_type=Filter.StringFilter.MatchType.EXACT,
+                ),
+            )
+        ),
+        limit=100000,
+    )
+    response = _client().run_report(request)
+    rows = [
+        {
+            "date": row.dimension_values[0].value,
+            "linkUrl": row.dimension_values[1].value,
+            "eventCount": float(row.metric_values[0].value),
+        }
+        for row in response.rows
+    ]
+    df = pd.DataFrame(rows, columns=["date", "linkUrl", "eventCount"])
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
+        df = df.sort_values(["date", "linkUrl"])
+    return df

@@ -1,6 +1,6 @@
 {
   "run_id": "2026-07",
-  "collected_at": "2026-07-24",
+  "collected_at": "2026-07-25",
   "days": 28,
   "current_period": {
     "start": "2026-06-26",
@@ -14,10 +14,10 @@
   "gsc_site_url": "sc-domain:hagakurepgm.net",
   "totals": {
     "current": {
-      "pages": 39,
-      "impressions": 1261.0,
-      "clicks": 49.0,
-      "ctr": 3.8858049167327517,
+      "pages": 40,
+      "impressions": 1342.0,
+      "clicks": 55.0,
+      "ctr": 4.098360655737705,
       "sessions": 93.0,
       "totalUsers": 62.0
     },
@@ -34,9 +34,9 @@
     "lp": {
       "current": {
         "pages": 5,
-        "impressions": 101.0,
+        "impressions": 104.0,
         "clicks": 13.0,
-        "ctr": 12.871287128712872,
+        "ctr": 12.5,
         "sessions": 93.0,
         "totalUsers": 62.0
       },
@@ -51,10 +51,10 @@
     },
     "blog": {
       "current": {
-        "pages": 34,
-        "impressions": 1160.0,
-        "clicks": 36.0,
-        "ctr": 3.103448275862069,
+        "pages": 35,
+        "impressions": 1238.0,
+        "clicks": 42.0,
+        "ctr": 3.392568659127625,
         "sessions": 0.0,
         "totalUsers": 0.0
       },
@@ -68,9 +68,15 @@
       }
     }
   },
+  "form_link_clicks": {
+    "event_name": "googleform_click",
+    "current": 2.0,
+    "previous": 2.0
+  },
   "notes": [
     "site=blog は page が /blog または /blog/ で始まる行。それ以外は lp。",
-    "フォーム送信などのコンバージョンは、キーイベント未設定のため本スクリプトでは取得しない。",
+    "googleform_click は参加フォームへのリンククリック。フォーム送信完了ではない。",
+    "フォーム送信完了数は本スクリプトでは取得しない。",
     "実測値のみ。推測はレポート本文で区別して書くこと。"
   ]
 }
