@@ -1,72 +1,85 @@
 ---
 name: hagakure-web-analysis
 description: >-
-  Runs the HAGAKURE programming community monthly web analysis in Cursor:
-  collect analysis context and GA4/GSC data, inspect the public LP/blog and
-  local site source, and write the plan.md deliverable under reports/. Use
-  when the user mentions 月次分析, RUN_ANALYSIS, plan.md に従って分析, or
-  asks to execute prompts/RUN_ANALYSIS.md.
+  Runs the HAGAKURE monthly web analysis using GA4, Search Console and the
+  public LP/blog, then creates practical web and community improvement actions.
+  Use for RUN_ANALYSIS, 月次分析, or the step-by-step analysis prompts.
 ---
 
 # HAGAKURE Web 月次分析
 
-## いつ使うか
+## 基準
 
-ユーザーが月次分析・`plan.md` に沿った分析・`@prompts/RUN_ANALYSIS.md` の実行を求めたとき。
+1. `plan.md` を目的・範囲・成果物の正とする。
+2. 一括実行は `prompts/RUN_ANALYSIS.md` に従う。
+3. 2段階実行は `prompts/RUN_ANALYSIS_STEP_BY_STEP.md` に従う。
+4. 分析・アクション品質は `prompts/RUN_ANALYSIS.md` の全要件に従う。
 
-## やること
+## 入力
 
-1. **必読**: リポジトリの `prompts/RUN_ANALYSIS.md` を開き、その手順を一字一句の作業指示として実行する。詳細・原則・成果物構成はすべてそこ（と `plan.md`）に従う。
-2. **事前確認**: データ収集を始める前に、分析対象期間の結果へ影響し得るイベントがあったかユーザーに必ず確認し、回答を `reports/<run_id>/context.md` に保存する。回答を得るまでは分析を開始しない。
-3. **実施記録**: `reports/action-log.md` を必ず読み、分析対象期間中に実施されたサイト・計測・運用上の改善を評価へ反映する。
-4. **データ**: `python scripts/collect_analysis_data.py` をリポジトリルートで実行し、`reports/<run_id>/raw/` を読む。GA4 の `googleform_click` を参加フォームへの到達を示す代替指標として必ず集計し、当期・前期のクリック数を比較する。
-5. **公開サイト実査**: https://hagakurepgm.net と https://hagakurepgm.net/blog/ を確認する。
-6. **サイトソース実査**: `/Users/itaru/cursor_project/hagakure_blog/` を読み、公開サイトの観察結果と照合する。特にテンプレート、ページモデル、URL、メタデータ・OGP、構造化データ、CTA・内部リンク、レスポンシブ対応、アクセシビリティ、計測コード、表示性能に関係する実装を確認する。記事本文のデータベースがないため、個別記事の内容や本番データは公開サイトを正とし、ソースだけから推測しない。
-7. **実査メモ**: `content-notes.md` に「公開サイトで確認した事実」「サイトソースで確認した事実」「両者を照合した改善候補」を分けて書く。ソース根拠には可能な範囲でファイルパスを付ける。
-8. **成果物**: `reports/<run_id>/report.md` に plan.md §7 の 15 章を書く。改善アクションには、該当する場合は実装対象のファイルまたは機能領域を記載する。
-9. **解釈**: `action-log.md` と `context.md` の出来事は確認された事実として記載できるが、数値変化との因果関係は断定せず、原因仮説の根拠として扱う。
-10. **指標の区別**: `googleform_click` はフォームを開いた回数であり、フォーム送信完了数や新規参加者数そのものではない。plan.md の年次 KGI「新規参加者10名」に対する代替指標として扱い、送信・参加実績が別途確認できない場合は未計測と明記する。
-11. **禁止**: 秘密鍵・環境変数・認証情報の読み取りや出力、データ不足の断定、急成長・売上前提の施策、レポート作成中のサイトソース変更、レポートに不要な大規模リファクタ。
+- 対象期間: 利用者が自然文で指定する
+- `inputs/external-events.md`: 今回分へ置き換える
+- `inputs/action-log.md`: 完了済みアクションを累積する
 
-## 実施記録の形式
+利用者へID、連番、保存先、コマンド引数を入力させない。
 
-`reports/action-log.md` は次の形式だけを使う。
+## 分析段階
 
-```markdown
-# 実施記録
+1. `prompts/01_ANALYZE.md` を実行する。
+2. GA4・GSCデータを実行時に取得する。
+3. LPとブログの公開ページを実査する。
+4. `plan.md` の6つのWebサイト運営目的を分析する。
+5. データ不足を課題の存在へ読み替えない。
+6. 事実と仮説を分ける。
+7. `reports/analysis.md` だけを作る。アクション案を書かない。
 
-- 2026-07-25: 参加フォームリンクのクリックをGA4 APIで取得する処理を追加
+## アクション提案段階
+
+1. 人が修正した場合は修正後の `reports/analysis.md` を正とする。
+2. `prompts/02_PROPOSE_ACTIONS.md` を実行する。
+3. データ、サイト実査、コミュニティとWebサイトの目的、実施済みアクション、
+   外部イベント、広報・編集・運営の実務知見を組み合わせる。
+4. 統計的有意差、大きなサンプル数、分析データとの直接対応を提案条件にしない。
+5. 各案の主な起点を「データ」「サイト実査」「目的」「実務仮説」から明記する。
+6. 各案について、対応目的、提案理由、実施内容、期待する変化、定量・定性の
+   確認方法を説明する。
+7. Webサイト内の改修だけでなく、広報、投稿・編集支援、地域連携、イベント、
+   コミュニティ運営、開発・運営の学習機会も検討する。
+8. すぐに行う対応、継続施策、中長期施策を目的と状況に応じて提案し、
+   施策の規模や期間を一律に制限しない。
+9. 対象者別の件数を固定せず、一般論の羅列ではなく実施可能な内容へ具体化する。
+10. 計測上の前提を改善施策と分ける。
+11. `inputs/action-log.md` と同じ完了済みアクションを再提案しない。
+12. `reports/actions.md` には現在の改善アクション案だけを記載する。
+
+## 指標
+
+- LP外部者のKGIはGoogleフォーム経由の新規参加者10名/年。
+- `googleform_click` はリンククリックであり、送信や参加ではない。
+- ブログ外部者のKGIは未設定。
+- ブログ参加者の記事作成件数は現在値・目標値とも未設定。
+- 未設定値を勝手に決定しない。
+
+## 保存
+
+```text
+reports/
+  analysis.md
+  actions.md
+
+.analysis/current/
+  raw/
+  context.md
+  manifest.json
+  quality-report.md
+  content-notes.md
+  stage-status.md
 ```
 
-改善を実際に完了したときだけ追記する。予定・提案・状態・担当者・効果などは書かない。
+過去版、月別成果物、実行IDを作らない。秘密鍵、トークン、認証情報を出力しない。
 
-## 分析コンテキストの形式
+## 人との境界
 
-`reports/<run_id>/context.md` には、イベントの日付と内容だけを書く。
-
-```markdown
-# 分析コンテキスト
-
-- 2026-07-10: HAGAKUREのイベントを開催
-- 2026-07-15: SNSで特定記事が紹介された
-```
-
-イベントが無い場合も確認済みであることを残す。
-
-```markdown
-# 分析コンテキスト
-
-- 2026-06-26 .. 2026-07-23: 特記事項なし
-```
-
-## ユーザーへの返し方
-
-- 短いエグゼクティブサマリー
-- 保存したパス（`report.md` / `content-notes.md` / `raw/`）
-- 計測できなかった点があれば一行で
-
-## 参照
-
-- 実行プロンプト: [prompts/RUN_ANALYSIS.md](../../../prompts/RUN_ANALYSIS.md)
-- 依頼書: [plan.md](../../../plan.md)
-- 収集スクリプト: [scripts/collect_analysis_data.py](../../../scripts/collect_analysis_data.py)
+分析エージェントは改善アクション案の作成まで行う。実行の最終判断、実装、公開、
+現実世界での活動、`inputs/action-log.md` への追記は行わない。人とLLMは
+`reports/actions.md` をもとに内容、優先順位、実施方法を調整できる。
