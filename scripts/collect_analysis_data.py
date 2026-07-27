@@ -9,7 +9,7 @@ Python 3.14 + pandas の segfault を避けるため、標準ライブラリ中�
 
 開始日と終了日は、利用者が自然な文章で指定した対象期間をエージェントが変換する。
 比較期間には、対象期間の直前にある同じ日数を使用する。
-出力は常に最新版だけを保持し、実行時に内部作業領域と利用者向け成果物を入れ替える。
+API収集が完了した後に、内部作業領域を最新版へ安全に入れ替える。
 """
 from __future__ import annotations
 
@@ -49,28 +49,56 @@ GA4_METRICS = [
 ]
 GSC_METRICS = ["clicks", "impressions", "ctr", "position"]
 FORM_CLICK_EVENT = "googleform_click"
-CURRENT_DIR = ROOT / ".analysis" / "current"
-REPORTS_DIR = ROOT / "reports"
-LATEST_REPORTS = (REPORTS_DIR / "analysis.md", REPORTS_DIR / "actions.md")
+ANALYSIS_DIR = ROOT / ".analysis"
+CURRENT_DIR = ANALYSIS_DIR / "current"
+STAGING_DIR = ANALYSIS_DIR / "next"
+BACKUP_DIR = ANALYSIS_DIR / "previous"
 GA4_PAGE_SIZE = 100000
 GSC_PAGE_SIZE = 25000
 
 
-def prepare_current_workspace() -> Path:
-    """最新版ワークスペースを空にし、raw出力先を返す。"""
-    expected_parent = ROOT / ".analysis"
-    if CURRENT_DIR.parent != expected_parent or CURRENT_DIR.name != "current":
-        raise RuntimeError(f"unsafe current directory: {CURRENT_DIR}")
+def recover_interrupted_publish() -> None:
+    """前回の置換中断で残った旧版を復元または破棄する。"""
+    if BACKUP_DIR.parent != ANALYSIS_DIR or BACKUP_DIR.name != "previous":
+        raise RuntimeError(f"unsafe backup directory: {BACKUP_DIR}")
+    if not BACKUP_DIR.exists():
+        return
     if CURRENT_DIR.exists():
-        shutil.rmtree(CURRENT_DIR)
-    for report in LATEST_REPORTS:
-        if report.parent != REPORTS_DIR:
-            raise RuntimeError(f"unsafe report path: {report}")
-        if report.exists():
-            report.unlink()
-    out_dir = CURRENT_DIR / "raw"
+        shutil.rmtree(BACKUP_DIR)
+    else:
+        BACKUP_DIR.rename(CURRENT_DIR)
+
+
+def prepare_staging_workspace() -> Path:
+    """収集成功まで現行データを残したまま、一時出力先を用意する。"""
+    if STAGING_DIR.parent != ANALYSIS_DIR or STAGING_DIR.name != "next":
+        raise RuntimeError(f"unsafe staging directory: {STAGING_DIR}")
+    ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+    recover_interrupted_publish()
+    if STAGING_DIR.exists():
+        shutil.rmtree(STAGING_DIR)
+    out_dir = STAGING_DIR / "raw"
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
+
+
+def publish_current_workspace() -> None:
+    """完成した一時出力を最新版へ置き換え、失敗時は旧版を復元する。"""
+    if not STAGING_DIR.is_dir():
+        raise FileNotFoundError(f"staging workspace not found: {STAGING_DIR}")
+    recover_interrupted_publish()
+
+    had_current = CURRENT_DIR.exists()
+    if had_current:
+        CURRENT_DIR.rename(BACKUP_DIR)
+    try:
+        STAGING_DIR.rename(CURRENT_DIR)
+    except Exception:
+        if had_current and BACKUP_DIR.exists() and not CURRENT_DIR.exists():
+            BACKUP_DIR.rename(CURRENT_DIR)
+        raise
+    if BACKUP_DIR.exists():
+        shutil.rmtree(BACKUP_DIR)
 
 
 def site_segment(page: str) -> str:
@@ -336,8 +364,6 @@ def main() -> int:
         parser.error("--start must be on or before --end")
     days = (end - start_requested).days + 1
 
-    out_dir = prepare_current_workspace()
-
     settings = load_settings()
     missing = settings.validate()
     if missing:
@@ -346,6 +372,7 @@ def main() -> int:
 
     creds = get_credentials()
     print("credentials: OK", flush=True)
+    out_dir = prepare_staging_workspace()
 
     start, end, prev_start, prev_end = period_pair(end, days)
     if start != start_requested:
@@ -493,6 +520,8 @@ def main() -> int:
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print("wrote summary.json", flush=True)
+    publish_current_workspace()
+    print(f"published: {CURRENT_DIR}", flush=True)
     print("RESULT: OK", flush=True)
     return 0
 
