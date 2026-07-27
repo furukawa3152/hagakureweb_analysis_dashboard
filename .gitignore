@@ -12,5 +12,10 @@ __pycache__/
 venv/
 .streamlit/secrets.toml
 
+# Regeneratable latest analysis output
+.analysis/
+reports/analysis.md
+reports/actions.md
+
 # OS
 .DS_Store

@@ -28,11 +28,13 @@ JSON 内の `client_email`（`xxx@xxx.iam.gserviceaccount.com`）をコピーし
 
 ## 3. 環境変数の設定
 
-```bash
-cp .env.example .env
-```
+リポジトリ直下に `.env` を作成し、次を設定する。
 
-`.env` を編集：
+```dotenv
+GOOGLE_APPLICATION_CREDENTIALS=credentials/service-account.json
+GA4_PROPERTY_ID=ここにGA4の数字ID
+GSC_SITE_URL=ここにSearch Consoleの対象URL
+```
 
 - `GOOGLE_APPLICATION_CREDENTIALS` … `credentials/service-account.json`（既定のまま）
 - `GA4_PROPERTY_ID` … GA4 管理画面「プロパティの詳細」に出る数字ID
@@ -55,5 +57,5 @@ streamlit run app.py
 
 - **403 PERMISSION_DENIED** … サービスアカウントのメールを GA4 / GSC に追加したか確認。
 - **API not enabled** … Cloud プロジェクトで Data API / Search Console API を有効化したか確認。
-- **データが空** … 期間内にデータがあるか、`GA4_PROPERTY_ID` / `GSC_SITE_URL` が正しいか確認。
-  当日分は集計が不安定なため、既定では前日までを表示。
+- **データが空** … 指定期間内にデータがあるか、`GA4_PROPERTY_ID` / `GSC_SITE_URL` が正しいか確認。
+  終了日が直近の場合はデータが未確定の可能性があるため、品質レポートの警告も確認する。
